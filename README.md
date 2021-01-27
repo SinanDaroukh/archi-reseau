@@ -1,3 +1,5 @@
+*Compte-rendu rédigé par Armen Aristakesyan, Florian Bouchut, Sinan Daroukh et Alexis Georges*
+
 # Architecture Sécurisé des Réseaux
 
 1. Installation de la VM OpenBSD avec VirtualBox.
@@ -99,7 +101,7 @@ Que faut t'il configurer pour que cette machine puisse résoudre des noms DNS ?
 
 ### Configurer le serveur DHCP
 
-------------------------------
+---
 
 ## Partie II : Le VPN
 
@@ -151,78 +153,152 @@ Pour se connecter au VPN avec un ordinateur sour MacOS :
 - Mettre le login `user` et le mot de passe `password`
 - Cliquer sur **Connecter**
 
-## Partie III : CARP/Pfsync
+---
 
-ifconfig em1 10.0.0.100 netmask 255.255.255.0
+## Partie III : CARP / Pfsync
 
-root@fw1 ~ #ifconfig em1 10.0.0.100 netmask 255.255.255.0
-root@fw1 ~ #ifconfig em2 10.0.1.100 netmask 255.255.255.0
-root@fw1 ~ #ifconfig em3 10.0.10.1 netmask 255.255.255.252
+Sur la VM OpenBSD `fw1` et `fw2` entrer les commandes suivantes :
 
-root@fw2 ~ #ifconfig em1 10.0.0.200 netmask 255.255.255.0
-root@fw2 ~ #ifconfig em2 10.0.1.200 netmask 255.255.255.0
-root@fw2 ~ #ifconfig em3 10.0.10.2 netmask 255.255.255.252
+     ifconfig em1 10.0.0.100 netmask 255.255.255.0
 
-root@fw1 ~ #ifconfig carp1 create
-root@fw1 ~ #ifconfig carp0 create
-root@fw1 ~ #ifconfig carp2 create
-idem fw2
+     ifconfig em1 10.0.0.100 netmask 255.255.255.0
+     ifconfig em2 10.0.1.100 netmask 255.255.255.0
+     ifconfig em3 10.0.10.1 netmask 255.255.255.252
 
-root@fw1 ~ #ifconfig carp0 vhid 10 pass root carpdev em0 advskew 1 192.168.1.111 netmask 255.255.255.0
-root@fw1 ~ #ifconfig carp1 vhid 11 pass root carpdev em1 advskew 1 10.0.0.1 netmask 255.255.255.0
-root@fw1 ~ #ifconfig carp2 vhid 12 pass root carpdev em2 advskew 1 10.0.1.1 netmask 255.255.255.0
+     ifconfig em1 10.0.0.200 netmask 255.255.255.0
+     ifconfig em2 10.0.1.200 netmask 255.255.255.0
+     ifconfig em3 10.0.10.2 netmask 255.255.255.252
 
-root@fw2 ~ #ifconfig carp0 vhid 10 pass root carpdev em0 advskew 100 192.168.1.111 netmask 255.255.255.0
-root@fw2 ~ #ifconfig carp1 vhid 11 pass root carpdev em1 advskew 100 10.0.0.1 netmask 255.255.255.0
-root@fw2 ~ #ifconfig carp2 vhid 12 pass root carpdev em2 advskew 100 10.0.1.1 netmask 255.255.255.0
-activation de la préemption et le basculement de toutes les interfaces # 
-sysctl -w net.inet.carp.preempt=1
+     ifconfig carp1 create
+     ifconfig carp0 create
+     ifconfig carp2 create
 
-### configuration de pfsync 
+Sur la VM `fw1` entrer les commandes suivantes :
 
-ifconfig pfsync0 syncdev em3 
-ifconfig pfsync0 up 
+     ifconfig carp0 vhid 10 pass root carpdev em0 advskew 1 192.168.1.111 netmask 255.255.255.0
+     ifconfig carp1 vhid 11 pass root carpdev em1 advskew 1 10.0.0.1 netmask 255.255.255.0
+     ifconfig carp2 vhid 12 pass root carpdev em2 advskew 1 10.0.1.1 netmask 255.255.255.0
 
-set skip on pfsync0
+Sur la VM `fw2` entrer les commandes suivantes :
+
+     ifconfig carp0 vhid 10 pass root carpdev em0 advskew 100 192.168.1.111 netmask 255.255.255.0
+     ifconfig carp1 vhid 11 pass root carpdev em1 advskew 100 10.0.0.1 netmask 255.255.255.0
+     ifconfig carp2 vhid 12 pass root carpdev em2 advskew 100 10.0.1.1 netmask 255.255.255.0
+
+Activation de la préemption et le basculement de toutes les interfaces 
+     
+     sysctl -w net.inet.carp.preempt=1
+
+### Configuration de PFSYNC 
+
+     ifconfig pfsync0 syncdev em3 
+     ifconfig pfsync0 up 
+
+     set skip on pfsync0
 
 Que faut il faire pour que le VPN marche sur l'ip flottante ? Est-ce que le VPN peut gérer le failover ?
 
-iked.conf
+Modifier le fichier `iked.conf` pour avoir le contenu suivant :
 
-  1 user 'android' 'password'
-  2 ikev2 'responder_eap' passive esp \
-  3         from 0.0.0.0/0 to 0.0.0.0 \
-  4         local 192.168.1.111 peer any \
-  5         srcid server1.domain \
-  6         eap "mschap-v2" \
-  7         config address 192.168.2.0/24 \
-  8         config name-server 192.168.1.111 \
-  9         tag "ROADW"
+     user 'android' 'password'
+     ikev2 'responder_eap' passive esp \
+              from 0.0.0.0/0 to 0.0.0.0 \
+              local 192.168.1.111 peer any \
+              srcid server1.domain \
+              eap "mschap-v2" \
+              config address 192.168.2.0/24 \
+              config name-server 192.168.1.111 \
+              tag "ROADW"
 
-changer le serveur en 192.168.1.111 dans la config sur le téléphone
-
-a l’air de fonctionner
+Changer le serveur en `192.168.1.111` dans la config sur le téléphone.
 
 Certains états ne devraient pas être synchronisés, lesquels, pourquoi, et comment s'assurer qu'ils restent locaux à chacun des firewall ?
 
-tout ce qui est broadcast et multicast apparemment
+     Tout ce qui est broadcast et multicast !
 
-https://sc1.checkpoint.com/documents/R76/CP_R76_ClusterXL_AdminGuide/7288.htm
-
-
-Faut t'il modifier la règle de NAT pour les différents réseaux ? Quels sont les conséquences sur les paquets en provenance des sous-réseaux 
-
-pass out on em0 from 10.0.0.0/24 to any nat-to 192.168.1.111
+Voir le lien suivant : https://sc1.checkpoint.com/documents/R76/CP_R76_ClusterXL_AdminGuide/7288.htm
 
 
-Load balancing 
+Faut t'il modifier la règle de NAT pour les différents réseaux ? Quels sont les conséquences sur les paquets en provenance des sous-réseaux ?
 
-root@fw1 ~ #ifconfig carp0 192.168.1.111 carpdev em0 carpnodes 1:0,2:100 balancing ip
-root@fw2 ~ # ifconfig carp0 192.168.1.111 carpdev em0 carpnodes 1:100,2:0 balancing ip
+     Oui il faut adapter chaque règle pour les différents réseaux. Les conséquences sont que chaque réseaux sort du réseaux avec la même adresse IP source.
 
-root@fw1 ~ #ifconfig carp1 10.0.0.1 carpdev em1 carpnodes 1:0,2:100 balancing ip
-root@fw2 ~ # ifconfig carp1 10.0.0.1 carpdev em1 carpnodes 1:100,2:0 balancing ip
+     pass out on em0 from 10.0.0.0/24 to any nat-to 192.168.1.111
 
-root@fw1 ~ #ifconfig carp2 10.0.1.1 carpdev em2 carpnodes 1:0,2:100 \
+
+### Load balancing 
+
+Sur `fw1` :
+
+     ifconfig carp0 192.168.1.111 carpdev em0 carpnodes 1:0,2:100 balancing ip
+     ifconfig carp1 10.0.0.1 carpdev em1 carpnodes 1:0,2:100 balancing ip
+     ifconfig carp2 10.0.1.1 carpdev em2 carpnodes 1:0,2:100 \
     balancing ip
-root@fw2 ~ # ifconfig carp2 10.0.1.1 carpdev em2 carpnodes 1:100,2:0 balancing ip
+
+Sur `fw2` :
+     
+     ifconfig carp0 192.168.1.111 carpdev em0 carpnodes 1:100,2:0 balancing ip
+     ifconfig carp1 10.0.0.1 carpdev em1 carpnodes 1:100,2:0 balancing ip
+     ifconfig carp2 10.0.1.1 carpdev em2 carpnodes 1:100,2:0 balancing ip
+
+---
+
+## Partie IV : Reverse Proxy
+
+Quels sont les fichiers a remodifier sur le clone ? Vérifier que les deux firewall peuvent y accéder.
+
+`/etc/network/interfaces`
+
+     auto enp0s3
+     iface enp0s3 inet static
+          address 10.0.0.3
+          netmask 255.255.255.0
+          gateway 10.0.0.1
+
+
+systemctl start lighttpd
+echo "<body><h1>Serveur 1 </h1></body>" > /var/www/index.lighttpd.html
+systemctl stop lighttpd
+systemctl start lighttpd
+
+lighttpd-enable-mod accesslog
+tail -f /var/log/lighttpd/access.log
+
+The following options will set the scheduling algorithm to select a host from the specified table:
+
+mode hash [key]
+Balances the outgoing connections across the active hosts based on the key, IP address and port of the relay. Additional input can be fed into the hash by looking at HTTP headers and GET variables; see the PROTOCOLS section below. This mode is only supported by relays.
+mode least-states
+Forward each outgoing connection to the active host with the least active pf(4) states. This mode is only supported by redirections.
+mode loadbalance [key]
+Balances the outgoing connections across the active hosts based on the key, the source IP address of the client, and the IP address and port of the relay. This mode is only supported by relays.
+mode random
+Distributes the outgoing connections randomly through all active hosts. This mode is supported by redirections and relays.
+mode roundrobin
+Distributes the outgoing connections using a round-robin scheduler through all active hosts. This is the default mode and will be used if no option has been specified. This mode is supported by redirections and relays.
+mode source-hash [key]
+Balances the outgoing connections across the active hosts based on the key and the source IP address of the client. This mode is supported by redirections and relays.
+
+
+vi /etc/relayd.conf
+rcctl enable relayd
+rcctl start relayd
+rcctl stop relayd
+
+debian1="10.0.0.2"
+debian2="10.0.0.3"
+table <webhosts> {
+        $debian1
+        $debian2
+}
+
+redirect www {
+        listen on 192.168.1.53 port 80 interface em0
+        forward to <webhosts> check http "/" code 200
+        pftag RELAYD
+}
+
+vi /etc/pf/conf
+ 
+rajouter ligne anchor "relayd/*"
+
