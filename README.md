@@ -347,7 +347,7 @@ Tapez les commandes suivantes :
 
 ### 6 - mode source-hash [key]
 
-> Balanace les connexions sortantes sur les hôtes actifs en fonction de la clé et de l'adresse IP source du client. Ce mode est pris en charge par des redirections et des relais.
+> Balance les connexions sortantes sur les hôtes actifs en fonction de la clé et de l'adresse IP source du client. Ce mode est pris en charge par des redirections et des relais.
 
 Dans le fichier `/etc/relayd.conf`, ajouter les lignes suivantes
 
@@ -375,9 +375,61 @@ Dans le fichier `/etc/pf/conf`, rajouter la ligne
 
 ## Partie V : Proxy sortant
 
-### Généralités
-
 ### Proxy filtrant
+
+Une fois que nous avons installer le paquet tinyproxy, pour configurer et bloquer l'accès à facebook , gmail , youtube et isima.fr , on ajoute les lignes suivantes dans le fichier `/etc/tinyproxy/filter`
+
+     isima\.fr$
+     gmail
+     youtube
+     facebook
+
+Et celle-ci dans le fichier `/etc/tinyproxy/tinyproxy.conf`
+
+     Anonymous "Host"
+     Anonymous "Authorization"
+     Anonymous "Cookie"
+
+     Filter "/etc/tinyproxy/filter"
+
+     Allow 10.0.1.2
+
+     LogFile "/var/log/tinyproxy/tinyproxy.log"
+
+> Quelle IP : port utiliser ?
+>>On utilise la 10.0.1.1:8888
+
+> Y'a t'il quelque chose d'autre à faire sur les firewalls ?
+>>Il faut modifier la configuration de PF pour autoriser le trafic sortant de la part du proxy.
+
+     pass out on em0 proto tcp to port { 80, 443 }
+     pass out on em0 proto tcp to port { 53 }
+
+En ajouter une pour autoriser les clients à contacter le proxy :
+
+     pass in out em2 inet proto tcp to port { 8888 }
+
+Pour finir, il faut interdire les clients à passer par les ports 80 / 443, et les obliger à passer par le proxy :
+
+     block in log on em2 all
+
+>Quel sont les problèmes posés une blacklist basée sur les domaines ? Avec un grand nombre de clients et de connections, quel est l'autre problème qui peut subvenir sur les firewall ?
+>>L'un des problèmes posés par une blacklist basée sur les domaines est le fait que les clients pourront toujours accéder aux sites par le biais de leur adresse IP. Quant au problème pouvant survenir sur les firewalls lors d'un grand nombre de connexions, c'est simplement le risque que ce dernier se retrouve dans l'incapacité de pouvoir accèder à toutes les requêtes clients.
 
 ### Proxy cache
 
+> Quelle est la directive de pf.conf pour ceci ?
+
+     pass in on em2 proto tcp from em2:network to any port { 80, 443 } rdr-to em2 port 3129
+
+>Quelle configuration spécifique faut t'il faire pour pouvoir aussi proxifier les requêtes en https ?
+>>L'utilisation du module SSLbump nous permettrait  de déchiffrer les connexions HTTPS.
+
+>Est-ce compatible avec le mode de fonctionnement transparent ?
+>>Le navigateur recevrait un certificat non valide si le proxy essayait d’intercepter la connexion et HTTPS ne serait possible, donc ce n'est pas compatible.
+
+>Quels sont les nouveaux problèmes posés ?
+>>Le proxy doit fonctionner en mode classique ou bien tous les clients devront installer un certificat signé par Tinyproxy sur leurs machines. Cela pose un risque de sécurité car il s’agit en réalité d’une attaque man-in-the-middle transparente pour les utilisateurs. De plus, les potentielles erreurs de certificat des sites visités par les utilisateurs ne s’afficheront pas. Les utilisateurs croieront toujours que leur connexion est bien chiffrée jusqu’au site, même en cas de problème.
+
+>Que pourrait-on faire de plus en complétant squid avec squidguard ?
+>>Nous pourrions approndir notre filtrage sur les sites autorisés et interdits.
